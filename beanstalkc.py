@@ -21,7 +21,7 @@ __version__ = '0.2.0'
 
 import logging
 import socket
-
+import threading
 
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 11300
@@ -43,7 +43,7 @@ class SocketError(BeanstalkcException):
             raise SocketError(e)
 
 
-class Connection(object):
+class Connection(threading.local):
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, parse_yaml=True,
                  connect_timeout=socket.getdefaulttimeout()):
         if parse_yaml is True:
@@ -56,8 +56,23 @@ class Connection(object):
         self._parse_yaml = parse_yaml or (lambda x: x)
         self.host = host
         self.port = port
-        self.connect()
+        self._conn = None
+        # defer the connect --  by notedit
+        #self.connect()
 
+    # add by notedit
+    @property
+    def _socket(self):
+        if self._conn:
+            return self._conn
+        self._conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._conn.settimeout(self._connect_timeout)
+        SocketError.wrap(self._conn.connect, (self.host, self.port))
+        self._conn.settimeout(None)
+        self._socket_file = self._conn.makefile('rb')
+        return self._conn
+
+    # this is used --  by notedit
     def connect(self):
         """Connect to beanstalkd server."""
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
